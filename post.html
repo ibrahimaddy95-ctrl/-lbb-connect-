@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ha">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Saka Listing - LBB Connect</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body style="padding-bottom:20px;">
+
+<div class="topbar">
+  <span onclick="history.back()" style="cursor:pointer;">←</span>
+  <h1>Saka Listing</h1>
+  <span></span>
+</div>
+
+<div style="padding:16px;">
+
+  <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px;">Iri</label>
+  <select id="type" style="width:100%;padding:12px;margin-bottom:14px;border:1px solid #ddd;border-radius:8px;">
+    <option value="marketplace">Marketplace (Kaya don sayarwa)</option>
+    <option value="service">Service (Sana'a/Sabis)</option>
+    <option value="directory">Business Directory (Shago/Kasuwanci)</option>
+  </select>
+
+  <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px;">Hoto</label>
+  <input type="file" id="images" accept="image/*" multiple style="width:100%;margin-bottom:14px;">
+  <div id="imagePreview" style="display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;"></div>
+
+  <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px;">Take (Title)</label>
+  <input type="text" id="title" placeholder="Misali: iPhone 13 Pro Max" style="width:100%;padding:12px;margin-bottom:14px;border:1px solid #ddd;border-radius:8px;">
+
+  <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px;">Description</label>
+  <textarea id="description" placeholder="Bayani game da kaya/sabis din..." rows="4" style="width:100%;padding:12px;margin-bottom:14px;border:1px solid #ddd;border-radius:8px;"></textarea>
+
+  <div id="priceField">
+    <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px;">Farashi (₦)</label>
+    <input type="number" id="price" placeholder="Misali: 150000" style="width:100%;padding:12px;margin-bottom:14px;border:1px solid #ddd;border-radius:8px;">
+  </div>
+
+  <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px;">Category</label>
+  <input type="text" id="category" placeholder="Misali: Electronics, Fashion, Plumbing..." style="width:100%;padding:12px;margin-bottom:14px;border:1px solid #ddd;border-radius:8px;">
+
+  <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px;">Jiha (State)</label>
+  <input type="text" id="state" placeholder="Misali: Kano" style="width:100%;padding:12px;margin-bottom:14px;border:1px solid #ddd;border-radius:8px;">
+
+  <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px;">Gari (City)</label>
+  <input type="text" id="city" placeholder="Misali: Kumbotso" style="width:100%;padding:12px;margin-bottom:20px;border:1px solid #ddd;border-radius:8px;">
+
+  <button class="btn" id="submitBtn" onclick="submitListing()">Buga Listing</button>
+  <p id="statusMsg" style="text-align:center; margin-top:12px; font-size:13px;"></p>
+
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-storage-compat.js"></script>
+<script src="../js/firebase-config.js"></script>
+<script src="../js/app.js"></script>
+<script>
+// Toggle price field based on type
+document.getElementById("type").addEventListener("change", (e) => {
+  document.getElementById("priceField").style.display =
+    e.target.value === "marketplace" ? "block" : "none";
+});
+
+// Preview selected images
+let selectedFiles = [];
+document.getElementById("images").addEventListener("change", (e) => {
+  selectedFiles = Array.from(e.target.files);
+  const preview = document.getElementById("imagePreview");
+  preview.innerHTML = "";
+  selectedFiles.forEach(file => {
+    const img = document.createElement("img");
+    img.src = URL.createObjectURL(file);
+    img.style.cssText = "width:70px;height:70px;object-fit:cover;border-radius:6px;";
+    preview.appendChild(img);
+  });
+});
+
+async function uploadImages(userId) {
+  const urls = [];
+  for (const file of selectedFiles) {
+    const ref = storage.ref(`listings/${userId}/${Date.now()}_${file.name}`);
+    await ref.put(file);
+    const url = await ref.getDownloadURL();
+    urls.push(url);
+  }
+  return urls;
+}
+
+async function submitListing() {
+  const statusMsg = document.getElementById("statusMsg");
+  const submitBtn = document.getElementById("submitBtn");
+
+  const user = auth.currentUser;
+  if (!user) {
+    statusMsg.style.color = "#e53935";
+    statusMsg.textContent = "Dole ka shiga (login) kafin ka saka listing.";
+    setTimeout(() => window.location.href = "login.html", 1500);
+    return;
+  }
+
+  const type = document.getElementById("type").value;
+  const title = document.getElementById("title").value.trim();
+  const description = document.getElementById("description").value.trim();
+  const price = document.getElementById("price").value;
+  const category = document.getElementById("category").value.trim();
+  const state = document.getElementById("state").value.trim();
+  const city = document.getElementById("city").value.trim();
+
+  if (!title || !description || !category || !state || !city) {
+    statusMsg.style.color = "#e53935";
+    statusMsg.textContent = "Cika duk fields masu muhimmanci.";
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Ana lodi...";
+  statusMsg.style.color = "#6b7280";
+  statusMsg.textContent = "Ana loda hotuna da bayani...";
+
+  try {
+    const imageUrls = selectedFiles.length > 0 ? await uploadImages(user.uid) : [];
+
+    await db.collection("listings").add({
+      userId: user.uid,
+      type: type,
+      title: title,
+      description: description,
+      price: type === "marketplace" && price ? Number(price) : null,
+      category: category,
+      subcategory: "",
+      images: imageUrls,
+      location: { state: state, city: city },
+      status: "active",
+      featured: false,
+      views: 0,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    statusMsg.style.color = "#2e7d32";
+    statusMsg.textContent = "An buga listing din cikin nasara!";
+    setTimeout(() => window.location.href = "../index.html", 1200);
+  } catch (err) {
+    console.error(err);
+    statusMsg.style.color = "#e53935";
+    statusMsg.textContent = "An samu matsala. Sake gwadawa.";
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Buga Listing";
+  }
+}
+</script>
+</body>
+</html>

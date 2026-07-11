@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ha">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shiga - LBB Connect</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body style="padding:20px; padding-bottom:20px;">
+
+<div style="text-align:center; margin:40px 0;">
+  <h1 style="color:#0a1f44; font-size:24px;">LBB Connect</h1>
+  <p style="color:#6b7280; font-size:13px;">Komai a wuri guda</p>
+</div>
+
+<div id="loginForm">
+  <h2 style="margin-bottom:16px; font-size:18px;">Shiga</h2>
+  <input type="email" id="loginEmail" placeholder="Email" style="width:100%;padding:12px;margin-bottom:10px;border:1px solid #ddd;border-radius:8px;">
+  <input type="password" id="loginPassword" placeholder="Password" style="width:100%;padding:12px;margin-bottom:14px;border:1px solid #ddd;border-radius:8px;">
+  <button class="btn" onclick="login()">Shiga</button>
+  <p id="loginError" style="color:#e53935; font-size:13px; margin-top:10px;"></p>
+  <p style="text-align:center; margin-top:20px; font-size:13px;">
+    Ba ka da account? <a href="#" onclick="toggleForm()" style="color:#0a1f44; font-weight:700;">Yi Signup</a>
+  </p>
+</div>
+
+<div id="signupForm" style="display:none;">
+  <h2 style="margin-bottom:16px; font-size:18px;">Bude Sabon Account</h2>
+  <input type="text" id="signupName" placeholder="Cikakken suna" style="width:100%;padding:12px;margin-bottom:10px;border:1px solid #ddd;border-radius:8px;">
+  <input type="tel" id="signupPhone" placeholder="Lambar waya" style="width:100%;padding:12px;margin-bottom:10px;border:1px solid #ddd;border-radius:8px;">
+  <input type="email" id="signupEmail" placeholder="Email" style="width:100%;padding:12px;margin-bottom:10px;border:1px solid #ddd;border-radius:8px;">
+  <input type="password" id="signupPassword" placeholder="Password (mafi karanci haruffa 6)" style="width:100%;padding:12px;margin-bottom:14px;border:1px solid #ddd;border-radius:8px;">
+  <button class="btn" onclick="signup()">Yi Signup</button>
+  <p id="signupError" style="color:#e53935; font-size:13px; margin-top:10px;"></p>
+  <p style="text-align:center; margin-top:20px; font-size:13px;">
+    Kana da account? <a href="#" onclick="toggleForm()" style="color:#0a1f44; font-weight:700;">Shiga</a>
+  </p>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-storage-compat.js"></script>
+<script src="../js/firebase-config.js"></script>
+<script>
+function toggleForm() {
+  document.getElementById("loginForm").style.display =
+    document.getElementById("loginForm").style.display === "none" ? "block" : "none";
+  document.getElementById("signupForm").style.display =
+    document.getElementById("signupForm").style.display === "none" ? "block" : "none";
+}
+
+async function login() {
+  const email = document.getElementById("loginEmail").value;
+  const password = document.getElementById("loginPassword").value;
+  const errorEl = document.getElementById("loginError");
+  errorEl.textContent = "";
+
+  if (!email || !password) {
+    errorEl.textContent = "Cika email da password.";
+    return;
+  }
+
+  try {
+    await auth.signInWithEmailAndPassword(email, password);
+    window.location.href = "../index.html";
+  } catch (err) {
+    errorEl.textContent = "Email ko password ba daidai ba ne.";
+    console.error(err);
+  }
+}
+
+async function signup() {
+  const name = document.getElementById("signupName").value;
+  const phone = document.getElementById("signupPhone").value;
+  const email = document.getElementById("signupEmail").value;
+  const password = document.getElementById("signupPassword").value;
+  const errorEl = document.getElementById("signupError");
+  errorEl.textContent = "";
+
+  if (!name || !phone || !email || !password) {
+    errorEl.textContent = "Cika duk fields.";
+    return;
+  }
+  if (password.length < 6) {
+    errorEl.textContent = "Password din dole yayi haruffa 6 ko sama da haka.";
+    return;
+  }
+
+  try {
+    const cred = await auth.createUserWithEmailAndPassword(email, password);
+    await db.collection("users").doc(cred.user.uid).set({
+      name: name,
+      phone: phone,
+      email: email,
+      photoURL: "",
+      role: "buyer",
+      businessName: "",
+      verified: false,
+      walletBalance: 0,
+      rating: 0,
+      reviewCount: 0,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    window.location.href = "../index.html";
+  } catch (err) {
+    if (err.code === "auth/email-already-in-use") {
+      errorEl.textContent = "Wannan email an riga an yi amfani da shi.";
+    } else {
+      errorEl.textContent = "An samu matsala. Sake gwadawa.";
+    }
+    console.error(err);
+  }
+}
+</script>
+</body>
+</html>
