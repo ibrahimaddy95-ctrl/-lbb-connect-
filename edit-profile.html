@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ha">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gyara Profile - LBB Connect</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body style="padding-bottom:20px;">
+
+<div class="topbar">
+  <span onclick="history.back()" style="cursor:pointer;">←</span>
+  <h1 style="font-size:15px;">Gyara Profile</h1>
+  <span></span>
+</div>
+
+<div style="padding:16px;">
+  <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px;">Suna</label>
+  <input type="text" id="name" style="width:100%;padding:12px;margin-bottom:14px;border:1px solid #ddd;border-radius:8px;">
+
+  <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px;">Lambar Waya</label>
+  <input type="tel" id="phone" style="width:100%;padding:12px;margin-bottom:14px;border:1px solid #ddd;border-radius:8px;">
+
+  <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px;">Sunan Kasuwanci (idan akwai)</label>
+  <input type="text" id="businessName" style="width:100%;padding:12px;margin-bottom:20px;border:1px solid #ddd;border-radius:8px;">
+
+  <button class="btn" onclick="saveProfile()">Ajiye</button>
+  <p id="statusMsg" style="text-align:center; margin-top:10px; font-size:13px;"></p>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-storage-compat.js"></script>
+<script src="../js/firebase-config.js"></script>
+<script src="../js/app.js"></script>
+<script>
+let uid = null;
+
+requireAuth(async (user) => {
+  uid = user.uid;
+  const doc = await db.collection("users").doc(uid).get();
+  const data = doc.data();
+  document.getElementById("name").value = data.name || "";
+  document.getElementById("phone").value = data.phone || "";
+  document.getElementById("businessName").value = data.businessName || "";
+});
+
+async function saveProfile() {
+  const statusMsg = document.getElementById("statusMsg");
+  const name = document.getElementById("name").value.trim();
+  const phone = document.getElementById("phone").value.trim();
+  const businessName = document.getElementById("businessName").value.trim();
+
+  if (!name || !phone) {
+    statusMsg.style.color = "#e53935";
+    statusMsg.textContent = "Cika suna da lambar waya.";
+    return;
+  }
+
+  try {
+    await db.collection("users").doc(uid).update({ name, phone, businessName });
+    statusMsg.style.color = "#2e7d32";
+    statusMsg.textContent = "An ajiye!";
+    setTimeout(() => window.location.href = "profile.html", 1000);
+  } catch (err) {
+    console.error(err);
+    statusMsg.style.color = "#e53935";
+    statusMsg.textContent = "An samu matsala.";
+  }
+}
+</script>
+</body>
+</html>

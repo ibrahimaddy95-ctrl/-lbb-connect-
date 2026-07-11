@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ha">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Review - LBB Connect</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body style="padding-bottom:20px;">
+
+<div class="topbar">
+  <span onclick="history.back()" style="cursor:pointer;">←</span>
+  <h1 style="font-size:15px;">Ba da Review</h1>
+  <span></span>
+</div>
+
+<div style="padding:16px;">
+  <label style="font-size:13px; font-weight:600; display:block; margin-bottom:8px;">Ƙima (Rating)</label>
+  <div id="stars" style="font-size:32px; margin-bottom:20px; letter-spacing:6px;">
+    <span data-star="1">☆</span><span data-star="2">☆</span><span data-star="3">☆</span><span data-star="4">☆</span><span data-star="5">☆</span>
+  </div>
+
+  <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px;">Sharhi</label>
+  <textarea id="comment" rows="4" placeholder="Yaya kwarewarka take da wannan mai sayarwa/sabis?" style="width:100%;padding:12px;margin-bottom:20px;border:1px solid #ddd;border-radius:8px;"></textarea>
+
+  <button class="btn" onclick="submitReview()">Aika Review</button>
+  <p id="statusMsg" style="text-align:center; margin-top:10px; font-size:13px;"></p>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-storage-compat.js"></script>
+<script src="../js/firebase-config.js"></script>
+<script src="../js/app.js"></script>
+<script>
+const params = new URLSearchParams(window.location.search);
+const listingId = params.get("id");
+let selectedRating = 0;
+let uid = null;
+
+requireAuth((user) => { uid = user.uid; });
+
+document.querySelectorAll("#stars span").forEach(star => {
+  star.addEventListener("click", () => {
+    selectedRating = Number(star.dataset.star);
+    document.querySelectorAll("#stars span").forEach(s => {
+      s.textContent = Number(s.dataset.star) <= selectedRating ? "★" : "☆";
+      s.style.color = Number(s.dataset.star) <= selectedRating ? "#f4b400" : "#000";
+    });
+  });
+});
+
+async function submitReview() {
+  const statusMsg = document.getElementById("statusMsg");
+  const comment = document.getElementById("comment").value.trim();
+
+  if (selectedRating === 0) {
+    statusMsg.style.color = "#e53935";
+    statusMsg.textContent = "Zabi rating kafin ka aika.";
+    return;
+  }
+  if (!comment) {
+    statusMsg.style.color = "#e53935";
+    statusMsg.textContent = "Rubuta sharhi.";
+    return;
+  }
+
+  try {
+    const listingDoc = await db.collection("listings").doc(listingId).get();
+    const sellerId = listingDoc.data().userId;
+
+    await db.collection("reviews").add({
+      listingId: listingId,
+      reviewerId: uid,
+      targetUserId: sellerId,
+      rating: selectedRating,
+      comment: comment,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    // Update seller's average rating
+    const sellerRef = db.collection("users").doc(sellerId);
+    await db.runTransaction(async (t) => {
+      const sellerDoc = await t.get(sellerRef);
+      const data = sellerDoc.data();
+      const newCount = (data.reviewCount || 0) + 1;
+      const newRating = (((data.rating || 0) * (data.reviewCount || 0)) + selectedRating) / newCount;
+      t.update(sellerRef, { rating: newRating, reviewCount: newCount });
+    });
+
+    statusMsg.style.color = "#2e7d32";
+    statusMsg.textContent = "Na gode! An aika review dinka.";
+    setTimeout(() => window.location.href = "listing-detail.html?id=" + listingId, 1200);
+  } catch (err) {
+    console.error(err);
+    statusMsg.style.color = "#e53935";
+    statusMsg.textContent = "An samu matsala.";
+  }
+}
+</script>
+</body>
+</html>

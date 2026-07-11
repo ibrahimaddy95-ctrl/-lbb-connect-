@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ha">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chat - LBB Connect</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+<div class="topbar">
+  <h1>Chat</h1>
+  <span></span>
+</div>
+
+<div id="chatList">
+  <p style="padding:20px; color:#6b7280;">Ana lodi...</p>
+</div>
+
+<nav class="bottom-nav">
+  <a href="../index.html" class="nav-item"><span class="icon">🏠</span><span>Home</span></a>
+  <a href="search.html" class="nav-item"><span class="icon">🔍</span><span>Search</span></a>
+  <a href="post.html" class="nav-item post-btn"><span class="icon">+</span><span>Post</span></a>
+  <a href="chat-list.html" class="nav-item active"><span class="icon">💬</span><span>Chat</span></a>
+  <a href="profile.html" class="nav-item"><span class="icon">👤</span><span>Profile</span></a>
+</nav>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-storage-compat.js"></script>
+<script src="../js/firebase-config.js"></script>
+<script src="../js/app.js"></script>
+<script>
+requireAuth(async (user) => {
+  const listEl = document.getElementById("chatList");
+
+  db.collection("chats")
+    .where("participants", "array-contains", user.uid)
+    .orderBy("lastMessageAt", "desc")
+    .onSnapshot(async (snapshot) => {
+      if (snapshot.empty) {
+        listEl.innerHTML = `<div class="empty-state"><p>Babu saƙonni tukuna.</p></div>`;
+        return;
+      }
+
+      listEl.innerHTML = "";
+      for (const doc of snapshot.docs) {
+        const chat = { id: doc.id, ...doc.data() };
+        const otherUserId = chat.participants.find(id => id !== user.uid);
+        const otherUserDoc = await db.collection("users").doc(otherUserId).get();
+        const otherUser = otherUserDoc.exists ? otherUserDoc.data() : { name: "User" };
+        const unread = chat.unreadCount?.[user.uid] || 0;
+
+        const item = document.createElement("div");
+        item.style.cssText = "display:flex; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid #f0f0f0; cursor:pointer;";
+        item.onclick = () => window.location.href = "chat.html?id=" + chat.id;
+        item.innerHTML = `
+          <div style="width:46px;height:46px;border-radius:50%;background:#0a1f44;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700; flex-shrink:0;">
+            ${(otherUser.name || "U")[0].toUpperCase()}
+          </div>
+          <div style="flex:1; min-width:0;">
+            <div style="font-weight:600; font-size:14px;">${otherUser.name || "User"}</div>
+            <div style="font-size:13px; color:#6b7280; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+              ${chat.lastMessage || "Fara tattaunawa..."}
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:11px; color:#9ca3af;">${timeAgo(chat.lastMessageAt)}</div>
+            ${unread > 0 ? `<div style="background:#e53935;color:#fff;border-radius:50%;width:18px;height:18px;font-size:10px;display:flex;align-items:center;justify-content:center;margin-left:auto;margin-top:4px;">${unread}</div>` : ''}
+          </div>
+        `;
+        listEl.appendChild(item);
+      }
+    });
+});
+</script>
+</body>
+</html>

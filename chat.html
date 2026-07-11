@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ha">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chat - LBB Connect</title>
+<link rel="stylesheet" href="../css/style.css">
+<style>
+  body { padding-bottom: 70px; background:#f0f2f5; }
+  #messages { padding: 12px 16px; display:flex; flex-direction:column; gap:8px; }
+  .msg { max-width:75%; padding:8px 12px; border-radius:14px; font-size:14px; line-height:1.4; }
+  .msg.sent { align-self:flex-end; background:#0a1f44; color:#fff; border-bottom-right-radius:4px; }
+  .msg.received { align-self:flex-start; background:#fff; color:#1a1a1a; border-bottom-left-radius:4px; box-shadow:0 1px 2px rgba(0,0,0,0.08); }
+  .msg-time { font-size:10px; opacity:0.7; margin-top:3px; }
+  #inputBar { position:fixed; bottom:0; left:0; right:0; background:#fff; padding:10px 12px; display:flex; gap:8px; border-top:1px solid #e5e7eb; }
+  #messageInput { flex:1; padding:10px 14px; border:1px solid #ddd; border-radius:20px; font-size:14px; }
+  #sendBtn { background:#0a1f44; color:#fff; border:none; width:42px; height:42px; border-radius:50%; font-size:16px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span onclick="history.back()" style="cursor:pointer;">←</span>
+  <h1 id="chatTitle" style="font-size:15px;">Chat</h1>
+  <span></span>
+</div>
+
+<div id="messages"></div>
+
+<div id="inputBar">
+  <input type="text" id="messageInput" placeholder="Rubuta saƙo..." onkeypress="if(event.key==='Enter') sendMessage()">
+  <button id="sendBtn" onclick="sendMessage()">➤</button>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-storage-compat.js"></script>
+<script src="../js/firebase-config.js"></script>
+<script src="../js/app.js"></script>
+<script>
+const params = new URLSearchParams(window.location.search);
+const chatId = params.get("id");
+let currentUserId = null;
+let otherUserId = null;
+
+requireAuth(async (user) => {
+  currentUserId = user.uid;
+
+  const chatDoc = await db.collection("chats").doc(chatId).get();
+  if (!chatDoc.exists) {
+    document.getElementById("chatTitle").textContent = "Chat ba a samu ba";
+    return;
+  }
+  const chatData = chatDoc.data();
+  otherUserId = chatData.participants.find(id => id !== currentUserId);
+
+  const otherUserDoc = await db.collection("users").doc(otherUserId).get();
+  document.getElementById("chatTitle").textContent = otherUserDoc.exists ? otherUserDoc.data().name : "User";
+
+  // Reset unread count for current user
+  db.collection("chats").doc(chatId).update({
+    [`unreadCount.${currentUserId}`]: 0
+  });
+
+  // Listen for messages in real-time
+  db.collection("chats").doc(chatId).collection("messages")
+    .orderBy("sentAt", "asc")
+    .onSnapshot(snapshot => {
+      const messagesEl = document.getElementById("messages");
+      messagesEl.innerHTML = "";
+      snapshot.forEach(doc => {
+        const msg = doc.data();
+        const isSent = msg.senderId === currentUserId;
+        const bubble = document.createElement("div");
+        bubble.className = "msg " + (isSent ? "sent" : "received");
+        bubble.innerHTML = `${msg.text}<div class="msg-time">${timeAgo(msg.sentAt)}</div>`;
+        messagesEl.appendChild(bubble);
+      });
+      window.scrollTo(0, document.body.scrollHeight);
+    });
+});
+
+async function sendMessage() {
+  const input = document.getElementById("messageInput");
+  const text = input.value.trim();
+  if (!text || !currentUserId) return;
+
+  input.value = "";
+
+  await db.collection("chats").doc(chatId).collection("messages").add({
+    senderId: currentUserId,
+    text: text,
+    imageURL: "",
+    sentAt: firebase.firestore.FieldValue.serverTimestamp(),
+    read: false
+  });
+
+  await db.collection("chats").doc(chatId).update({
+    lastMessage: text,
+    lastMessageAt: firebase.firestore.FieldValue.serverTimestamp(),
+    [`unreadCount.${otherUserId}`]: firebase.firestore.FieldValue.increment(1)
+  });
+}
+</script>
+</body>
+</html>
